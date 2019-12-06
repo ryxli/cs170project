@@ -2,6 +2,7 @@ import os
 import sys
 import cvxpy as cp
 import numpy as np
+import itertools
 
 sys.path.append("..")
 sys.path.append("../..")
@@ -36,8 +37,129 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
 
     shortestPaths = nx.floyd_warshall(agraph)
 
-    d = {5: [5], 10:[10], 15:[15], 20:[20]}
+    tourHomes = []
+    unvisited_homes = list.copy(list_of_homes[1:])
+    current = 0
+    while unvisited_homes:
+        tourHomes += [current]
+        homes = shortestPaths[current]
+        length = float('inf')
+        nextHome = None
+        for i in range(len(list_of_locations)):
+            if list_of_locations[i] in unvisited_homes:
+                if homes[i] < length:
+                    length = homes[i]
+                    nextHome = i
+        unvisited_homes.remove(list_of_locations[nextHome])
+        current = nextHome
+    tourHomes += [current]
 
+    path = [0]
+    predecessors, _ = nx.floyd_warshall_predecessor_and_distance(agraph)
+    for i in range(len(tourHomes)-1):
+        subpath = nx.reconstruct_path(tourHomes[i], tourHomes[i+1], predecessors)
+        path += subpath[1:]
+    path += nx.reconstruct_path(tourHomes[len(tourHomes)-1], 0, predecessors)[1:]
+
+    #print(path)
+
+    drop = {}
+    for p in path:
+        drop[p] = []
+
+    for i in range(len(list_of_locations)):
+        if list_of_locations[i] in list_of_homes:
+            closest = None
+            length = float('inf')
+            for p in path:
+                if shortestPaths[p][i] < length:
+                    length = shortestPaths[p][i]
+                    closest = p
+            drop[closest] += [i]
+
+    #print("before reducing ", cost_of_solution(agraph, path, drop))
+
+
+    while (path):
+        increase = []
+        for i in path:
+            inc = 0
+            for j in range(len(list_of_locations)):
+                if list_of_locations[j] in list_of_homes:
+                    minDist = float('inf')
+                    closest = None
+                    excludeMinDist = float('inf')
+                    excludeClosest = None
+                    for p in path:
+                        if shortestPaths[p][j] < minDist:
+                            closest = p
+                            minDist = shortestPaths[p][j]
+                    exclude = list.copy(path)
+                    exclude.remove(i)
+                    for p in exclude:
+                        if shortestPaths[p][j] < excludeMinDist:
+                            excludeClosest = p
+                            excludeMinDist = shortestPaths[p][j]
+                    inc += excludeMinDist - minDist
+
+            increase += [inc]
+
+        maxS = float('-inf')
+        maxI = None
+        toRemove = []
+        for i in range(len(path)-2):
+            s = 2 / 3 * shortestPaths[path[i]][path[i+1]] + 2 / 3 * shortestPaths[path[i+1]][path[i+2]] \
+                - 2 / 3 * shortestPaths[path[i]][path[i+2]] - increase[i+1]
+            if s >= maxS and (path[i], path[i+2]) in agraph.edges:
+                maxS = s
+                maxI = i+1
+        if maxS <= 0:
+            break;
+        if path[maxI] in path:
+            path = path[:maxI] + path[maxI+1:]
+        for i in range(len(path)-1):
+            if path[i] == path[i+1]:
+                path.remove(path[i])
+
+
+    #print(path)
+
+    dropoffs = {}
+    for p in path:
+        dropoffs[p] = []
+
+    for i in range(len(list_of_locations)):
+        if list_of_locations[i] in list_of_homes:
+            closest = None
+            length = float('inf')
+            for p in path:
+                if shortestPaths[p][i] < length:
+                    length = shortestPaths[p][i]
+                    closest = p
+            dropoffs[closest] += [i]
+
+    #print(cost_of_solution(agraph, path, dropoffs))
+    """
+
+    print(path)
+    numDropLoc = 0
+    for key in dropoffs.keys():
+        if dropoffs[key] != []:
+            numDropLoc += 1
+    print(numDropLoc)
+    for key in dropoffs.keys():
+        print(list_of_locations[key], [list_of_locations[x] for x in dropoffs[key]])
+    """
+    return path, dropoffs
+
+
+    f=open("outputs/help.txt", "w+")
+    for i in range(10):
+     f.write("This is line %d\r\n" % (i+1))
+     f.close()
+
+    """
+    #ATTEMPT AT LINEAR PROGRAMMING
     numLoc = len(list_of_locations)
     numHom = len(list_of_homes)
     start = 0
@@ -52,7 +174,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         z = []
         c = []
         for j in range(numLoc):
-            z += [cp.Variable(1, boolean = True)]
+            z += [cp.Variable(1, integer = True)]
             c += [shortestPaths[i][j]]
         Z += [z]
         C += [c]
@@ -63,7 +185,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         x = []
         d = []
         for j in range(numLoc):
-            x += [cp.Variable(1, boolean = True)]
+            x += [cp.Variable(1, integer = True)]
             d += [shortestPaths[j][i]]
         X += [x]
         D += [d]
@@ -90,6 +212,32 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                 constraint2 += X[i][j]
         constraints += [constraint2 == 1]
 
+    #CONSTRAINT 3
+    subsets = []
+    for i in range(numLoc):
+        subsets += list(itertools.combinations(list(range(numLoc))[1:], i))
+    for s in subsets:
+        for i in range(numHom):
+            constraint3 = X[i][0]
+            for j in range(numLoc):
+                if j != 0:
+                    constraint3 += X[i][j]
+            for j in s:
+                notInS = [x for x in list(range(numLoc)) if x not in s]
+                for k in notInS:
+                    constraint3 += 0.5 * Z[j][k]
+            constraints += [constraint3 >= 1]
+    print("hello")
+
+    #CONSTRAINT 4
+    for i in range(numHom):
+        for j in range(numLoc):
+            constraints += [X[i][j] >= 0]
+    #CONSTRAINT 5
+    for i in range(numLoc):
+        for j in range(numLoc):
+            constraints += [Z[i][j] >= 0]
+
     #MINIMIZING OBJECTIVE
     exp = C[0][0] * Z[0][0]
     for i in range(numLoc):
@@ -101,9 +249,11 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
     problem = cp.Problem(objective, constraints)
     problem.solve()
 
+
+    print(problem.status)
+
     print("optimal purchasing cost is: ", constraint1.value)
     #print("num of product 0 is: ", constraints[1].value)
-    print("X matrix: ", [[j.value for j in i] for i in X])
 
 
 
@@ -111,10 +261,10 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
 
     # The optimal dual variable (Lagrange multiplier) for
     # a constraint is stored in constraint.dual_value.
-    
+
 
 """
-
+"""
     TADropOffs = {}
     carPath = []
 
