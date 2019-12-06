@@ -33,22 +33,29 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
 
     agraph, message = adjacency_matrix_to_graph(adjacency_matrix)
     edgelist = adjacency_matrix_to_edge_list(adjacency_matrix)
+
+    shortestPaths = nx.floyd_warshall(agraph)
+
     d = {5: [5], 10:[10], 15:[15], 20:[20]}
 
     numLoc = len(list_of_locations)
     numHom = len(list_of_homes)
+    start = 0
 
     # INITIALIZE ALL VARIABLES AND CONSTANTS
     Z = [] #matrix of edges in graph, represents tour/cycle solution
     C = [] #matrix of travel distances between locations (shortest paths)
-    for i in range(numLoc):
+
+    for i in range(numLoc): #hacky hack to figure out what number is starting car location
+        if starting_car_location == list_of_locations[i]:
+            start = i
         z = []
         c = []
         for j in range(numLoc):
             z += [cp.Variable(1, boolean = True)]
-            c += [cp.Variable(1, boolean = True)]
-        Z += z
-        C += c
+            c += [shortestPaths[i][j]]
+        Z += [z]
+        C += [c]
 
     X = [] #matrix of TA drop off locations (i: TA/home, j: dropoff location)
     D = [] #matrix of costs of dropping off TA at location ("")
@@ -57,36 +64,54 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         d = []
         for j in range(numLoc):
             x += [cp.Variable(1, boolean = True)]
-            d += [cp.Variable(1, boolean = True)]
-        X += x
-        D += d
+            d += [shortestPaths[j][i]]
+        X += [x]
+        D += [d]
+
+    budget = 0 #calculate from walking distance for shortest paths
+    for i in range(numHom):
+        budget += shortestPaths[start][i]
+
+    constraints = []
+
+    #CONSTRAINT 1
+    constraint1 = D[0][0] * X[0][0]
+    for i in range(numHom):
+        for j in range(numLoc):
+            if i != 0 and j != 0:
+                constraint1 += D[i][j] * X[i][j]
+    constraints += [constraint1 <= budget]
+
+    #CONSTRAINT 2
+    for i in range(numHom):
+        constraint2 = X[i][0]
+        for j in range(numLoc):
+            if j != 0:
+                constraint2 += X[i][j]
+        constraints += [constraint2 == 1]
+
+    #MINIMIZING OBJECTIVE
+    exp = C[0][0] * Z[0][0]
+    for i in range(numLoc):
+        for j in range(numLoc):
+            if i != 0 and j != 0:
+                exp += C[i][j] * Z[i][j]
+    objective = cp.Minimize(exp)
+
+    problem = cp.Problem(objective, constraints)
+    problem.solve()
+
+    print("optimal purchasing cost is: ", constraint1.value)
+    #print("num of product 0 is: ", constraints[1].value)
+    print("X matrix: ", [[j.value for j in i] for i in X])
 
 
 
 
-
-    matrixZ = np.zeros((len(list_of_homes), len(list_locations)))
-    Z = cp.Variable(matrixZ.shape[1], boolean = True)
-
-    x = cp.Variable()
-    y = cp.Variable()
-
-    # Create two constraints.
-    constraints = [x + y == 1,
-                   x - y >= 1]
-
-    # Form objective.
-    obj = cp.Minimize((x - y)**2)
-
-    # Form and solve problem.
-    prob = cp.Problem(obj, constraints)
-    prob.solve()
 
     # The optimal dual variable (Lagrange multiplier) for
     # a constraint is stored in constraint.dual_value.
-    print("optimal (x + y == 1) dual variable", constraints[0].dual_value)
-    print("optimal (x - y >= 1) dual variable", constraints[1].dual_value)
-    print("x - y value:", (x - y).value)
+    
 
 """
 
