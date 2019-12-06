@@ -1,5 +1,7 @@
 import os
 import sys
+import cvxpy as cp
+import numpy as np
 
 sys.path.append("..")
 sys.path.append("../..")
@@ -28,9 +30,65 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         A dictionary mapping drop-off location to a list of homes of TAs that got off at that particular location
         NOTE: both outputs should be in terms of indices not the names of the locations themselves
     """
+
     agraph, message = adjacency_matrix_to_graph(adjacency_matrix)
-    edgelist = adjacency_matrix_to_edgelist(adjacency_matrix)
+    edgelist = adjacency_matrix_to_edge_list(adjacency_matrix)
     d = {5: [5], 10:[10], 15:[15], 20:[20]}
+
+    numLoc = len(list_of_locations)
+    numHom = len(list_of_homes)
+
+    # INITIALIZE ALL VARIABLES AND CONSTANTS
+    Z = [] #matrix of edges in graph, represents tour/cycle solution
+    C = [] #matrix of travel distances between locations (shortest paths)
+    for i in range(numLoc):
+        z = []
+        c = []
+        for j in range(numLoc):
+            z += [cp.Variable(1, boolean = True)]
+            c += [cp.Variable(1, boolean = True)]
+        Z += z
+        C += c
+
+    X = [] #matrix of TA drop off locations (i: TA/home, j: dropoff location)
+    D = [] #matrix of costs of dropping off TA at location ("")
+    for i in range(numHom):
+        x = []
+        d = []
+        for j in range(numLoc):
+            x += [cp.Variable(1, boolean = True)]
+            d += [cp.Variable(1, boolean = True)]
+        X += x
+        D += d
+
+
+
+
+
+    matrixZ = np.zeros((len(list_of_homes), len(list_locations)))
+    Z = cp.Variable(matrixZ.shape[1], boolean = True)
+
+    x = cp.Variable()
+    y = cp.Variable()
+
+    # Create two constraints.
+    constraints = [x + y == 1,
+                   x - y >= 1]
+
+    # Form objective.
+    obj = cp.Minimize((x - y)**2)
+
+    # Form and solve problem.
+    prob = cp.Problem(obj, constraints)
+    prob.solve()
+
+    # The optimal dual variable (Lagrange multiplier) for
+    # a constraint is stored in constraint.dual_value.
+    print("optimal (x + y == 1) dual variable", constraints[0].dual_value)
+    print("optimal (x - y >= 1) dual variable", constraints[1].dual_value)
+    print("x - y value:", (x - y).value)
+
+"""
 
     TADropOffs = {}
     carPath = []
@@ -46,7 +104,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         currLengths = []
         currPaths = []
         for home in unvisited_homes:
-            length, path = nx.dijkstra_path(agraph, currHome, home)
+            length, path = nx.single_source_dijkstra(agraph, currHome, home, None, 'weight')
             currLengths += [length]
             currPaths += [path]
 
@@ -59,7 +117,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         nextPaths = []
         for home in unvisited_homes:
             if closestHome != home:
-                length, path = nx.dijkstra_path(agraph, closestHome, home)
+                length, path = nx.single_source_dijkstra(agraph, closestHome, home, None, 'weight')
                 nextLengths += [length]
                 nextPaths += [path]
 
@@ -71,16 +129,19 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         currHome = closestHome
         dropOffTA(TADropOffs, currHome, unvisited_homes, currHome)
 
-    length, path = nx.dijkstra_path(agraph, currHome, starting_car_location)
+    length, path = nx.single_source_dijkstra(agraph, currHome, starting_car_location, None, 'weight')
     carPath += path
     return carPath, TADropOffs
 
 def dropOffTA(dropoffs, location, unvisited_homes, home):
-    droppedOff = dropoffs.getOrDefault(location, [])
+    if location in dropoffs.keys():
+        droppedOff = dropoffs[location]
+    else:
+        droppedOff = []
     dropoffs[location] = droppedOff + [home]
     unvisited_homes.remove(home)
 
-
+"""
 
 
 """
