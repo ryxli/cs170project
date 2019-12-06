@@ -61,7 +61,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         path += subpath[1:]
     path += nx.reconstruct_path(tourHomes[len(tourHomes)-1], 0, predecessors)[1:]
 
-    print(path)
+    #print(path)
 
     drop = {}
     for p in path:
@@ -77,7 +77,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                     closest = p
             drop[closest] += [i]
 
-    print("before reducing ", cost_of_solution(agraph, path, drop))
+    #print("before reducing ", cost_of_solution(agraph, path, drop))
 
 
     while (path):
@@ -122,7 +122,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                 path.remove(path[i])
 
 
-    print(path)
+    #print(path)
 
     dropoffs = {}
     for p in path:
@@ -138,7 +138,25 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                     closest = p
             dropoffs[closest] += [i]
 
-    print(cost_of_solution(agraph, path, dropoffs))
+    #print(cost_of_solution(agraph, path, dropoffs))
+    """
+
+    print(path)
+    numDropLoc = 0
+    for key in dropoffs.keys():
+        if dropoffs[key] != []:
+            numDropLoc += 1
+    print(numDropLoc)
+    for key in dropoffs.keys():
+        print(list_of_locations[key], [list_of_locations[x] for x in dropoffs[key]])
+    """
+    return path, dropoffs
+
+
+    f=open("outputs/help.txt", "w+")
+    for i in range(10):
+     f.write("This is line %d\r\n" % (i+1))
+     f.close()
 
     """
     #ATTEMPT AT LINEAR PROGRAMMING
