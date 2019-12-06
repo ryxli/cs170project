@@ -106,17 +106,29 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
 
         maxS = float('-inf')
         maxI = None
+        toRemove = []
         for i in range(len(path)-2):
-            s = shortestPaths[path[i]][path[i+1]] + shortestPaths[path[i+1]][path[i+2]] \
-                - shortestPaths[path[i]][path[i+2]] - increase[i+1]
-            if s > maxS and adjacency_matrix[path[i]][path[i+2]] != 0:
+            if path[i] == path[i+1]:
+                toRemove += [i]
+            s = 2 / 3 * shortestPaths[path[i]][path[i+1]] + 2 / 3 * shortestPaths[path[i+1]][path[i+2]] \
+                - 2 / 3 * shortestPaths[path[i]][path[i+2]] - increase[i+1]
+            if s >= maxS and (path[i], path[i+2]) in agraph.edges:
                 maxS = s
                 maxI = i+1
+        for i in toRemove:
+            if path[i] in path:
+                path.remove(path[i])
         if maxS <= 0:
             break;
-        path.remove(path[maxI])
+        if path[maxI] in path:
+            path.remove(path[maxI])
+
 
     print(path)
+
+    for i in range(len(path)-1):
+        if adjacency_matrix[path[i]][path[i+1]] == 0:
+            print("uh oh ", path[i], path[i+1])
 
     dropoffs = {}
     for p in path:
