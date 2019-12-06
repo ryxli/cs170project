@@ -31,7 +31,56 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
     agraph, message = adjacency_matrix_to_graph(adjacency_matrix)
     edgelist = adjacency_matrix_to_edgelist(adjacency_matrix)
     d = {5: [5], 10:[10], 15:[15], 20:[20]}
-    return [0, 5, 10, 15, 20, 0], d
+
+    TADropOffs = {}
+    carPath = []
+
+    #compute shortest distances to all homes
+    unvisited_homes = list.copy(list_of_homes)
+    currHome = starting_car_location
+    if currHome in unvisited_homes:
+        dropOffTA(TADropOffs, currHome, unvisited_homes, currHome)
+
+    while unvisited_homes:
+        carPath += [currHome]
+        currLengths = []
+        currPaths = []
+        for home in unvisited_homes:
+            length, path = nx.dijkstra_path(agraph, currHome, home)
+            currLengths += [length]
+            currPaths += [path]
+
+        index = a.index(min(a))
+        shortestPath = currPaths[index]
+        closestHome = shortestPath[len(currPaths)-1]
+
+
+        nextLengths = []
+        nextPaths = []
+        for home in unvisited_homes:
+            if closestHome != home:
+                length, path = nx.dijkstra_path(agraph, closestHome, home)
+                nextLengths += [length]
+                nextPaths += [path]
+
+        if nextLengths and nextPaths:
+            for i, home in unvisited_homes:
+                if nextLengths[i] > currLengths[i]:
+                    dropOffTA(TADropOffs, currHome, unvisited_homes, home)
+
+        currHome = closestHome
+        dropOffTA(TADropOffs, currHome, unvisited_homes, currHome)
+
+    length, path = nx.dijkstra_path(agraph, currHome, starting_car_location)
+    carPath += path
+    return carPath, TADropOffs
+
+def dropOffTA(dropoffs, location, unvisited_homes, home):
+    droppedOff = dropoffs.getOrDefault(location, [])
+    dropoffs[location] = droppedOff + [home]
+    unvisited_homes.remove(home)
+
+
 
 
 """
