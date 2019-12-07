@@ -38,8 +38,10 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
     shortestPaths = nx.floyd_warshall(agraph)
 
     tourHomes = []
-    unvisited_homes = list.copy(list_of_homes[1:])
-    current = 0
+    unvisited_homes = list.copy(list_of_homes)
+    current = list_of_locations.index(starting_car_location)
+    if current in unvisited_homes:
+        unvisited_homes.remove(current)
     while unvisited_homes:
         tourHomes += [current]
         homes = shortestPaths[current]
@@ -54,12 +56,12 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         current = nextHome
     tourHomes += [current]
 
-    path = [0]
+    path = [list_of_locations.index(starting_car_location)]
     predecessors, _ = nx.floyd_warshall_predecessor_and_distance(agraph)
     for i in range(len(tourHomes)-1):
         subpath = nx.reconstruct_path(tourHomes[i], tourHomes[i+1], predecessors)
         path += subpath[1:]
-    path += nx.reconstruct_path(tourHomes[len(tourHomes)-1], 0, predecessors)[1:]
+    path += nx.reconstruct_path(tourHomes[len(tourHomes)-1], list_of_locations.index(starting_car_location), predecessors)[1:]
 
     #print(path)
 
@@ -125,8 +127,6 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
     #print(path)
 
     dropoffs = {}
-    for p in path:
-        dropoffs[p] = []
 
     for i in range(len(list_of_locations)):
         if list_of_locations[i] in list_of_homes:
@@ -136,7 +136,10 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                 if shortestPaths[p][i] < length:
                     length = shortestPaths[p][i]
                     closest = p
-            dropoffs[closest] += [i]
+            if closest in dropoffs.keys():
+                dropoffs[closest] += [i]
+            else:
+                dropoffs[closest] = [i]
 
     #print(cost_of_solution(agraph, path, dropoffs))
     """
