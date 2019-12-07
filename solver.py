@@ -31,8 +31,19 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         A dictionary mapping drop-off location to a list of homes of TAs that got off at that particular location
         NOTE: both outputs should be in terms of indices not the names of the locations themselves
     """
+    agraph, message = adjacency_matrix_to_graph(adjacency_matrix)
+    edgelist = adjacency_matrix_to_edge_list(adjacency_matrix)
+
     gshPath, gshDropoffs = generalizedSavingsHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix)
     trhPath, trhDropoffs = tourReductionHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix)
+
+    gshCost = cost_of_solution(agraph, gshPath, gshDropoffs)
+    trhCost = cost_of_solution(agraph, trhPath, trhDropoffs)
+
+    if ghsCost < trhCost:
+        return gshPath, gshDropoffs
+    else:
+        return trhPath, trhDropoffs
 
 
 
