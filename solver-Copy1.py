@@ -1,0 +1,230 @@
+import os
+import sys
+import cvxpy as cp
+import numpy as np
+
+sys.path.append("..")
+sys.path.append("../..")
+import argparse
+import utils
+
+from student_utils import *
+from collections import defaultdict
+
+"""
+======================================================================
+  Complete the following function.
+======================================================================
+"""
+
+
+def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix, params=[]):
+    """
+    Write your algorithm here.
+    Input:
+        list_of_locations: A list of locations such that node i of the graph corresponds to name at index i of the list
+        list_of_homes: A list of homes
+        starting_car_location: The name of the starting location for the car
+        adjacency_matrix: The adjacency matrix from the input file
+    Output:
+        A list of locations representing the car path
+        A dictionary mapping drop-off location to a list of homes of TAs that got off at that particular location
+        NOTE: both outputs should be in terms of indices not the names of the locations themselves
+    """
+
+    agraph, message = adjacency_matrix_to_graph(adjacency_matrix)
+    edgelist = adjacency_matrix_to_edge_list(adjacency_matrix)
+
+    SP = nx.floyd_warshall(agraph)
+
+    path = [starting_car_location]
+    loc_opt = ""
+    best_cost = float("inf")
+    for loc in list_of_locations:
+        temp_sum = 0
+        for home in list_of_homes:
+            h = list_of_locations.index(home)
+            l = list_of_locations.index(loc)
+            temp_sum += SP[l][h]
+
+        if temp_sum < best_cost:
+            loc_opt = loc
+            best_cost = temp_sum
+    path.append(loc_opt)
+    path.append(starting_car_location)
+    
+    costperiteminpath = NestedDict()
+    decreaseincost = NestedDict()
+    cont = True
+    tadroppedoff = NestedDict()
+    
+    while(cont):
+        for k in list_of_homes:
+            minval = float("inf")
+            for st in path:
+                h = list_of_locations.index(k)
+                l = list_of_locations.index(st)
+                if SP[l][h] < minval:
+                    minval = SP[l][h]
+                    tadroppedoff[k] = l
+                costperiteminpath[tuple(path)][k] = minval
+        
+        for k in list_of_homes:
+            maxval = 0
+            for p in list_of_locations:
+                if not p in path:
+                    h = list_of_locations.index(k)
+                    l = list_of_locations.index(p)
+                    val = costperiteminpath[tuple(path)][k] - SP[l][h]
+                    decreaseincost[tuple(path)][p][k] = val if val>0 else 0
+    
+        savings = NestedDict()
+        maxval = float("-inf")
+        maxi = None
+        maxj = None
+        maxp = None
+        for i in path:
+            for j in path:
+                for p in list_of_locations:
+                    if not p in path:
+                        tempsum = 0
+                        for k in list_of_homes:
+                            tempsum += decreaseincost[tuple(path)][p][k]
+                        i_ = list_of_locations.index(i)
+                        j_ = list_of_locations.index(j)
+                        p_ = list_of_locations.index(p)
+                        val = SP[i_][j_]-SP[i_][p_]-SP[p_][j_] + tempsum
+                        savings[i][j][p] = val
+                        if val > maxval:
+                            maxval = val
+                            maxi = i
+                            maxj = j
+                            maxp = p
+        if savings[maxi][maxj][maxp] > 0:
+            path.insert(path.index(maxi)+1, maxp)
+        else:
+            cont = False
+            
+    dropofflocations = defaultdict(list)
+    for k,v in tadroppedoff.items():
+        dropofflocations[v].append(list_of_locations.index(k))
+    
+    path = [list_of_locations.index(i) for i in path]
+    count = 0
+    fill_list = []
+    for (index, thing) in enumerate(path[:-1]): 
+        current, next_ = thing, path[index + 1]
+        if not (current, next_) in agraph.edges:
+            fill = nx.dijkstra_path(agraph, current, next_)
+            fill_list.append((index, fill))
+    count = 0;
+    ret_path = []
+    for i, p in enumerate(path):
+        if count < len(fill_list) and i == fill_list[count][0]:
+            for e in fill_list[count][1][:-1]:
+                ret_path.append(e)
+            count += 1
+        else:
+            ret_path.append(p)
+    return path, dropofflocations
+
+
+class NestedDict(dict):
+    def __missing__(self, key):
+        value = self[key] = type(self)()
+        return value
+
+"""
+======================================================================
+   No need to change any code below this line
+======================================================================
+"""
+
+"""
+Convert solution with path and dropoff_mapping in terms of indices
+and write solution output in terms of names to path_to_file + file_number + '.out'
+"""
+
+
+def convertToFile(path, dropoff_mapping, path_to_file, list_locs):
+    string = ""
+    for node in path:
+        string += list_locs[node] + " "
+    string = string.strip()
+    string += "\n"
+
+    dropoffNumber = len(dropoff_mapping.keys())
+    string += str(dropoffNumber) + "\n"
+    for dropoff in dropoff_mapping.keys():
+        strDrop = list_locs[dropoff] + " "
+        for node in dropoff_mapping[dropoff]:
+            strDrop += list_locs[node] + " "
+        strDrop = strDrop.strip()
+        strDrop += "\n"
+        string += strDrop
+    utils.write_to_file(path_to_file, string)
+
+
+def solve_from_file(input_file, output_directory, params=[]):
+    print("Processing", input_file)
+
+    input_data = utils.read_file(input_file)
+    (
+        num_of_locations,
+        num_houses,
+        list_locations,
+        list_houses,
+        starting_car_location,
+        adjacency_matrix,
+    ) = data_parser(input_data)
+    car_path, drop_offs = solve(
+        list_locations,
+        list_houses,
+        starting_car_location,
+        adjacency_matrix,
+        params=params,
+    )
+
+    basename, filename = os.path.split(input_file)
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+    output_file = utils.input_to_output(input_file, output_directory)
+
+    convertToFile(car_path, drop_offs, output_file, list_locations)
+
+
+def solve_all(input_directory, output_directory, params=[]):
+    input_files = utils.get_files_with_extension(input_directory, "in")
+
+    for input_file in input_files:
+        solve_from_file(input_file, output_directory, params=params)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Parsing arguments")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="If specified, the solver is run on all files in the input directory. Else, it is run on just the given input file",
+    )
+    parser.add_argument(
+        "input", type=str, help="The path to the input file or directory"
+    )
+    parser.add_argument(
+        "output_directory",
+        type=str,
+        nargs="?",
+        default=".",
+        help="The path to the directory where the output should be written",
+    )
+    parser.add_argument(
+        "params", nargs=argparse.REMAINDER, help="Extra arguments passed in"
+    )
+    args = parser.parse_args()
+    output_directory = args.output_directory
+    if args.all:
+        input_directory = args.input
+        solve_all(input_directory, output_directory, params=args.params)
+    else:
+        input_file = args.input
+        solve_from_file(input_file, output_directory, params=args.params)
