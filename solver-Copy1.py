@@ -52,12 +52,12 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
             best_cost = temp_sum
     path.append(loc_opt)
     path.append(starting_car_location)
-
+    
     costperiteminpath = NestedDict()
     decreaseincost = NestedDict()
     cont = True
     tadroppedoff = NestedDict()
-
+    
     while(cont):
         for k in list_of_homes:
             minval = float("inf")
@@ -68,7 +68,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                     minval = SP[l][h]
                     tadroppedoff[k] = l
                 costperiteminpath[tuple(path)][k] = minval
-
+        
         for k in list_of_homes:
             maxval = 0
             for p in list_of_locations:
@@ -77,7 +77,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                     l = list_of_locations.index(p)
                     val = costperiteminpath[tuple(path)][k] - SP[l][h]
                     decreaseincost[tuple(path)][p][k] = val if val>0 else 0
-
+    
         savings = NestedDict()
         maxval = float("-inf")
         maxi = None
@@ -100,24 +100,19 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                             maxi = i
                             maxj = j
                             maxp = p
-        if savings[maxi][maxj][maxp] > 0:
+        if (maxi != None) and savings[maxi][maxj][maxp] > 0:
             path.insert(path.index(maxi)+1, maxp)
         else:
             cont = False
-
+            
     dropofflocations = defaultdict(list)
     for k,v in tadroppedoff.items():
         dropofflocations[v].append(list_of_locations.index(k))
-
-    print(path)
-
+    
     path = [list_of_locations.index(i) for i in path]
-
-    print(path)
-
     count = 0
     fill_list = []
-    for (index, thing) in enumerate(path[:-1]):
+    for (index, thing) in enumerate(path[:-1]): 
         current, next_ = thing, path[index + 1]
         if not (current, next_) in agraph.edges:
             fill = nx.dijkstra_path(agraph, current, next_)
@@ -131,10 +126,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
             count += 1
         else:
             ret_path.append(p)
-
-    print(path)
-
-    return path, dropofflocations
+    return ret_path, dropofflocations
 
 
 class NestedDict(dict):

@@ -35,6 +35,10 @@ def write_data_to_file(file, data, separator, append=False):
 
 
 def input_to_output(input_file, output_directory):
+    print(os.path.join(output_directory, os.path.basename(input_file))
+        .replace("input", "output")
+        .replace(".in", ".out"))
+    print("hi")
     return (
         os.path.join(output_directory, os.path.basename(input_file))
         .replace("input", "output")
