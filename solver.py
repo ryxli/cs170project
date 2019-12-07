@@ -122,7 +122,7 @@ def generalizedSavingsHeuristic(list_of_locations, list_of_homes, starting_car_l
                             maxi = i
                             maxj = j
                             maxp = p
-        if savings[maxi][maxj][maxp] > 0:
+        if (maxi != None) and savings[maxi][maxj][maxp] > 0:
             path.insert(path.index(maxi)+1, maxp)
         else:
             cont = False
