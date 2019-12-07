@@ -1,6 +1,5 @@
 import os
 import sys
-import cvxpy as cp
 import numpy as np
 import itertools
 
