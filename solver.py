@@ -131,11 +131,11 @@ def generalizedSavingsHeuristic(list_of_locations, list_of_homes, starting_car_l
     for k,v in tadroppedoff.items():
         dropofflocations[v].append(list_of_locations.index(k))
 
-    print(path)
+    #print(path)
 
     path = [list_of_locations.index(i) for i in path]
 
-    print(path)
+    #print(path)
 
     count = 0
     fill_list = []
@@ -154,7 +154,7 @@ def generalizedSavingsHeuristic(list_of_locations, list_of_homes, starting_car_l
         else:
             ret_path.append(p)
 
-    print(path)
+    #print(path)
 
     return path, dropofflocations
 
@@ -256,7 +256,7 @@ def tourReductionHeuristic(list_of_locations, list_of_homes, starting_car_locati
                 path.remove(path[i])
 
 
-    print(path)
+    #print(path)
 
     dropoffs = {}
 
