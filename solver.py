@@ -10,6 +10,8 @@ import argparse
 import utils
 
 from student_utils import *
+from collections import defaultdict
+
 
 """
 ======================================================================
@@ -37,10 +39,14 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
     gshPath, gshDropoffs = generalizedSavingsHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix)
     trhPath, trhDropoffs = tourReductionHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix)
 
-    gshCost = cost_of_solution(agraph, gshPath, gshDropoffs)
-    trhCost = cost_of_solution(agraph, trhPath, trhDropoffs)
+    gshCost, _ = cost_of_solution(agraph, gshPath, gshDropoffs)
+    trhCost, _ = cost_of_solution(agraph, trhPath, trhDropoffs)
 
-    if ghsCost < trhCost:
+    if type(gshCost) == str:
+        gshCost = float('inf')
+    if type(trhCost) == str:
+        trhCost = float('inf')
+    if gshCost < trhCost:
         return gshPath, gshDropoffs
     else:
         return trhPath, trhDropoffs
