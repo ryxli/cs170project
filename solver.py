@@ -124,7 +124,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                 path.remove(path[i])
 
 
-    #print(path)
+    print(path)
 
     dropoffs = {}
 
