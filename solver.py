@@ -31,7 +31,122 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
         A dictionary mapping drop-off location to a list of homes of TAs that got off at that particular location
         NOTE: both outputs should be in terms of indices not the names of the locations themselves
     """
+    gshPath, gshDropoffs = generalizedSavingsHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix)
+    trhPath, trhDropoffs = tourReductionHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix)
 
+
+
+def generalizedSavingsHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix):
+    agraph, message = adjacency_matrix_to_graph(adjacency_matrix)
+    edgelist = adjacency_matrix_to_edge_list(adjacency_matrix)
+
+    SP = nx.floyd_warshall(agraph)
+
+    path = [starting_car_location]
+    loc_opt = ""
+    best_cost = float("inf")
+    for loc in list_of_locations:
+        temp_sum = 0
+        for home in list_of_homes:
+            h = list_of_locations.index(home)
+            l = list_of_locations.index(loc)
+            temp_sum += SP[l][h]
+
+        if temp_sum < best_cost:
+            loc_opt = loc
+            best_cost = temp_sum
+    path.append(loc_opt)
+    path.append(starting_car_location)
+
+    costperiteminpath = NestedDict()
+    decreaseincost = NestedDict()
+    cont = True
+    tadroppedoff = NestedDict()
+
+    while(cont):
+        for k in list_of_homes:
+            minval = float("inf")
+            for st in path:
+                h = list_of_locations.index(k)
+                l = list_of_locations.index(st)
+                if SP[l][h] < minval:
+                    minval = SP[l][h]
+                    tadroppedoff[k] = l
+                costperiteminpath[tuple(path)][k] = minval
+
+        for k in list_of_homes:
+            maxval = 0
+            for p in list_of_locations:
+                if not p in path:
+                    h = list_of_locations.index(k)
+                    l = list_of_locations.index(p)
+                    val = costperiteminpath[tuple(path)][k] - SP[l][h]
+                    decreaseincost[tuple(path)][p][k] = val if val>0 else 0
+
+        savings = NestedDict()
+        maxval = float("-inf")
+        maxi = None
+        maxj = None
+        maxp = None
+        for i in path:
+            for j in path:
+                for p in list_of_locations:
+                    if not p in path:
+                        tempsum = 0
+                        for k in list_of_homes:
+                            tempsum += decreaseincost[tuple(path)][p][k]
+                        i_ = list_of_locations.index(i)
+                        j_ = list_of_locations.index(j)
+                        p_ = list_of_locations.index(p)
+                        val = SP[i_][j_]-SP[i_][p_]-SP[p_][j_] + tempsum
+                        savings[i][j][p] = val
+                        if val > maxval:
+                            maxval = val
+                            maxi = i
+                            maxj = j
+                            maxp = p
+        if savings[maxi][maxj][maxp] > 0:
+            path.insert(path.index(maxi)+1, maxp)
+        else:
+            cont = False
+
+    dropofflocations = defaultdict(list)
+    for k,v in tadroppedoff.items():
+        dropofflocations[v].append(list_of_locations.index(k))
+
+    print(path)
+
+    path = [list_of_locations.index(i) for i in path]
+
+    print(path)
+
+    count = 0
+    fill_list = []
+    for (index, thing) in enumerate(path[:-1]):
+        current, next_ = thing, path[index + 1]
+        if not (current, next_) in agraph.edges:
+            fill = nx.dijkstra_path(agraph, current, next_)
+            fill_list.append((index, fill))
+    count = 0;
+    ret_path = []
+    for i, p in enumerate(path):
+        if count < len(fill_list) and i == fill_list[count][0]:
+            for e in fill_list[count][1][:-1]:
+                ret_path.append(e)
+            count += 1
+        else:
+            ret_path.append(p)
+
+    print(path)
+
+    return path, dropofflocations
+
+class NestedDict(dict):
+    def __missing__(self, key):
+        value = self[key] = type(self)()
+        return value
+
+def tourReductionHeuristic(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix):
     agraph, message = adjacency_matrix_to_graph(adjacency_matrix)
     edgelist = adjacency_matrix_to_edge_list(adjacency_matrix)
 
@@ -142,185 +257,7 @@ def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_mat
                 dropoffs[closest] = [i]
 
     #print(cost_of_solution(agraph, path, dropoffs))
-    """
-
-    print(path)
-    numDropLoc = 0
-    for key in dropoffs.keys():
-        if dropoffs[key] != []:
-            numDropLoc += 1
-    print(numDropLoc)
-    for key in dropoffs.keys():
-        print(list_of_locations[key], [list_of_locations[x] for x in dropoffs[key]])
-    """
     return path, dropoffs
-
-
-    f=open("outputs/help.txt", "w+")
-    for i in range(10):
-     f.write("This is line %d\r\n" % (i+1))
-     f.close()
-
-    """
-    #ATTEMPT AT LINEAR PROGRAMMING
-    numLoc = len(list_of_locations)
-    numHom = len(list_of_homes)
-    start = 0
-
-    # INITIALIZE ALL VARIABLES AND CONSTANTS
-    Z = [] #matrix of edges in graph, represents tour/cycle solution
-    C = [] #matrix of travel distances between locations (shortest paths)
-
-    for i in range(numLoc): #hacky hack to figure out what number is starting car location
-        if starting_car_location == list_of_locations[i]:
-            start = i
-        z = []
-        c = []
-        for j in range(numLoc):
-            z += [cp.Variable(1, integer = True)]
-            c += [shortestPaths[i][j]]
-        Z += [z]
-        C += [c]
-
-    X = [] #matrix of TA drop off locations (i: TA/home, j: dropoff location)
-    D = [] #matrix of costs of dropping off TA at location ("")
-    for i in range(numHom):
-        x = []
-        d = []
-        for j in range(numLoc):
-            x += [cp.Variable(1, integer = True)]
-            d += [shortestPaths[j][i]]
-        X += [x]
-        D += [d]
-
-    budget = 0 #calculate from walking distance for shortest paths
-    for i in range(numHom):
-        budget += shortestPaths[start][i]
-
-    constraints = []
-
-    #CONSTRAINT 1
-    constraint1 = D[0][0] * X[0][0]
-    for i in range(numHom):
-        for j in range(numLoc):
-            if i != 0 and j != 0:
-                constraint1 += D[i][j] * X[i][j]
-    constraints += [constraint1 <= budget]
-
-    #CONSTRAINT 2
-    for i in range(numHom):
-        constraint2 = X[i][0]
-        for j in range(numLoc):
-            if j != 0:
-                constraint2 += X[i][j]
-        constraints += [constraint2 == 1]
-
-    #CONSTRAINT 3
-    subsets = []
-    for i in range(numLoc):
-        subsets += list(itertools.combinations(list(range(numLoc))[1:], i))
-    for s in subsets:
-        for i in range(numHom):
-            constraint3 = X[i][0]
-            for j in range(numLoc):
-                if j != 0:
-                    constraint3 += X[i][j]
-            for j in s:
-                notInS = [x for x in list(range(numLoc)) if x not in s]
-                for k in notInS:
-                    constraint3 += 0.5 * Z[j][k]
-            constraints += [constraint3 >= 1]
-    print("hello")
-
-    #CONSTRAINT 4
-    for i in range(numHom):
-        for j in range(numLoc):
-            constraints += [X[i][j] >= 0]
-    #CONSTRAINT 5
-    for i in range(numLoc):
-        for j in range(numLoc):
-            constraints += [Z[i][j] >= 0]
-
-    #MINIMIZING OBJECTIVE
-    exp = C[0][0] * Z[0][0]
-    for i in range(numLoc):
-        for j in range(numLoc):
-            if i != 0 and j != 0:
-                exp += C[i][j] * Z[i][j]
-    objective = cp.Minimize(exp)
-
-    problem = cp.Problem(objective, constraints)
-    problem.solve()
-
-
-    print(problem.status)
-
-    print("optimal purchasing cost is: ", constraint1.value)
-    #print("num of product 0 is: ", constraints[1].value)
-
-
-
-
-
-    # The optimal dual variable (Lagrange multiplier) for
-    # a constraint is stored in constraint.dual_value.
-
-
-"""
-"""
-    TADropOffs = {}
-    carPath = []
-
-    #compute shortest distances to all homes
-    unvisited_homes = list.copy(list_of_homes)
-    currHome = starting_car_location
-    if currHome in unvisited_homes:
-        dropOffTA(TADropOffs, currHome, unvisited_homes, currHome)
-
-    while unvisited_homes:
-        carPath += [currHome]
-        currLengths = []
-        currPaths = []
-        for home in unvisited_homes:
-            length, path = nx.single_source_dijkstra(agraph, currHome, home, None, 'weight')
-            currLengths += [length]
-            currPaths += [path]
-
-        index = a.index(min(a))
-        shortestPath = currPaths[index]
-        closestHome = shortestPath[len(currPaths)-1]
-
-
-        nextLengths = []
-        nextPaths = []
-        for home in unvisited_homes:
-            if closestHome != home:
-                length, path = nx.single_source_dijkstra(agraph, closestHome, home, None, 'weight')
-                nextLengths += [length]
-                nextPaths += [path]
-
-        if nextLengths and nextPaths:
-            for i, home in unvisited_homes:
-                if nextLengths[i] > currLengths[i]:
-                    dropOffTA(TADropOffs, currHome, unvisited_homes, home)
-
-        currHome = closestHome
-        dropOffTA(TADropOffs, currHome, unvisited_homes, currHome)
-
-    length, path = nx.single_source_dijkstra(agraph, currHome, starting_car_location, None, 'weight')
-    carPath += path
-    return carPath, TADropOffs
-
-def dropOffTA(dropoffs, location, unvisited_homes, home):
-    if location in dropoffs.keys():
-        droppedOff = dropoffs[location]
-    else:
-        droppedOff = []
-    dropoffs[location] = droppedOff + [home]
-    unvisited_homes.remove(home)
-
-"""
-
 
 """
 ======================================================================
