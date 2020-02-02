@@ -1,6 +1,9 @@
 # project-fa19
 CS 170 Fall 2019 Project
 
+solves an instance of the traveling purchasing problem https://en.wikipedia.org/wiki/Traveling_purchaser_problem
+uses heuristic approximation based on “Approximate Algorithms for the Travelling Purchaser Problem” by Hoon Liong Ong
+
 Run
 
 python solver.py inputdirectory/ outputdirectory/
